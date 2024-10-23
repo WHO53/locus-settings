@@ -4,6 +4,7 @@
 #include <sys/utsname.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdlib.h> // For popen and system commands
 #include "../main.h"
 
 #define BOX_WIDTH app.width
@@ -42,6 +43,27 @@ void get_kernel_version(char *kernel_version) {
         strcpy(kernel_version, buffer.release);
     } else {
         strcpy(kernel_version, "Unknown Kernel");
+    }
+}
+
+// Function to get the username
+void get_username(char *username) {
+    char *login_name = getlogin();
+    if (login_name) {
+        strcpy(username, login_name);
+    } else {
+        strcpy(username, "Unknown User");
+    }
+}
+
+// Function to get the CPU name
+void get_cpu_name(char *cpu_name) {
+    FILE *fp = popen("lscpu | grep 'Model name' | awk -F: '{print $2}' | xargs", "r");
+    if (fp != NULL) {
+        fgets(cpu_name, 256, fp);
+        pclose(fp);
+    } else {
+        strcpy(cpu_name, "Unknown CPU");
     }
 }
 
@@ -89,10 +111,12 @@ void draw_about_panel(cairo_t *cr, int width, int height) {
     cairo_fill(cr);
 
     // Get system information
-    char pretty_name[256], kernel_version[256], hostname[256];
+    char pretty_name[256], kernel_version[256], hostname[256], username[256], cpu_name[256];
     get_os_release(pretty_name);
     get_kernel_version(kernel_version);
     get_hostname(hostname);
+    get_username(username);
+    get_cpu_name(cpu_name);
 
     int x = 0;
     int y = 0;
@@ -107,19 +131,20 @@ void draw_about_panel(cairo_t *cr, int width, int height) {
     cairo_move_to(cr, TEXT_PADDING * 4, app.height * 0.05);
     cairo_show_text(cr, "About");
 
-    // Display system information
-    const char *info[] = {
-        "Username: user",
-        pretty_name,
-        kernel_version,
-        hostname
-    };
+    // Display system information in the required format
+    char info[6][256];
+    snprintf(info[0], sizeof(info[0]), "User : %s", username);
+    snprintf(info[1], sizeof(info[1]), "OS : %s", pretty_name);
+    snprintf(info[2], sizeof(info[2]), "Kernel : %s", kernel_version);
+    snprintf(info[3], sizeof(info[3]), "Hostname : %s", hostname);
+    snprintf(info[4], sizeof(info[4]), "CPU : %s", cpu_name);
 
     // Draw each info item
-    for (int i = 0; i < sizeof(info) / sizeof(info[0]); i++) {
+    for (int i = 0; i < 5; i++) {
         y = (app.height * .10) + i * (BOX_HEIGHT + BOX_PADDING);
 
         draw_text_box(cr, x, y);
         draw_text_left(cr, x, y, info[i]);
     }
 }
+
